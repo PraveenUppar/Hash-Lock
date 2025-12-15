@@ -1,6 +1,6 @@
 Todo
 
-- Sigin
+- Signup
 - Login
 - Forgot Password
 - Reset password
