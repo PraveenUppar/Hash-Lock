@@ -4,27 +4,50 @@ import { loginSchema } from "@/lib/validators/auth";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { z } from "zod";
+import { ratelimit } from "@/lib/redis/ratelimit";
 
 export async function POST(request: Request) {
+  // 1. Get IP
+  const ip = request.headers.get("x-forwarded-for") ?? "127.0.0.1";
+
+  // 2. CHECK RATE LIMIT
+  const { success, limit, reset, remaining } = await ratelimit.limit(ip);
+
+  // --- THIS WAS MISSING ---
+  // If the limit is hit (success is false), return a 429 error immediately.
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later." },
+      {
+        status: 429,
+        headers: {
+          "X-RateLimit-Limit": limit.toString(),
+          "X-RateLimit-Remaining": remaining.toString(),
+          "X-RateLimit-Reset": reset.toString(),
+        },
+      }
+    );
+  }
+  // ------------------------
+
   try {
     const body = await request.json();
     const { email, password } = loginSchema.parse(body);
 
-    // 1. Find User
+    // 3. Find User
     const user = await prisma.user.findUnique({
       where: { email },
     });
 
-    // 2. Verify User exists AND has a password (OAuth users might not have one)
+    // 4. Verify User exists AND has a password
     if (!user || !user.passwordHash) {
-      // Generic error message to prevent enumeration
       return NextResponse.json(
         { error: "Invalid email or password" },
         { status: 401 }
       );
     }
 
-    // 3. Verify Password
+    // 5. Verify Password
     const isValid = await verifyPassword(user.passwordHash, password);
 
     if (!isValid) {
@@ -34,7 +57,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 4. Create Session & Set Cookie
+    // 6. Create Session & Set Cookie
     await createSession(user.id);
 
     return NextResponse.json({ success: true }, { status: 200 });
