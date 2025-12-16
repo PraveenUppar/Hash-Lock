@@ -37,7 +37,7 @@ A robust, security-focused authentication system built entirely from scratch. Th
 
 ## Database Schema
 
-The normalized schema tightly links users, events, orders, tickets, and ticket variants with strict foreign keys to maintain referential integrity.
+The normalized schema tightly links users, sessions, and accounts with strict foreign keys to maintain referential integrity.
 
 > _See `prisma/schema.prisma` for the full definition._
 
@@ -53,7 +53,26 @@ The normalized schema tightly links users, events, orders, tickets, and ticket v
 
 ## System Workflows
 
-### 1. OAuth 2.0 Workflow (Google)
+### 1. User Registration Workflow
+
+This flow ensures data integrity and cryptographic security before a user record is ever created.
+
+1.  **Input:** Client submits email and password via the Sign-Up form.
+2.  **Validation:** Zod schema validates email format and enforces password complexity (min length, special chars).
+3.  **Uniqueness Check:** The system queries the database to ensure the email is not already registered.
+4.  **Hashing:** The password is **not** stored as plain text. It is passed through the **Argon2id** algorithm, which generates a unique salt and hashes the credential.
+5.  **Storage:** The new user record is created in the PostgreSQL database with the `password_hash`.
+6.  **Response:** The user is redirected to the Login page (or automatically logged in, depending on configuration).
+
+### 2. User Login Workflow
+
+The login process handles credential verification, session creation, and the optional MFA branch.
+
+1.  **Rate Limiting:** The request IP is checked against Upstash Redis. If >5 attempts in 60s, the request is blocked.
+2.  **Lookup:** The system retrieves the user record by email.
+3.  **Verification:** The provided password is hashed and compared against the stored `password_hash` using Argon2id.
+
+### 3. OAuth 2.0 Workflow (Google)
 
 This project implements the standard Authorization Code Flow to securely exchange user credentials without handling raw Google passwords.
 
@@ -65,7 +84,7 @@ This project implements the standard Authorization Code Flow to securely exchang
 6.  **Account Linking:** The system checks if the email exists. If yes, it links the Google Account to the existing user. If no, it creates a new user.
 7.  **Session Creation:** A secure session cookie is issued.
 
-### 2. Forgot Password Workflow
+### 4. Forgot Password Workflow
 
 A stateless, token-based flow designed to prevent "Email Enumeration" attacks.
 
@@ -103,16 +122,17 @@ Instead of outdated algorithms like MD5 or fast algorithms like SHA-256 (which a
 
 To prevent brute-force attacks on the login endpoint:
 
-Algorithm: Sliding Window.
-Limit: 5 requests per 60 seconds per IP address.
-Storage: Managed via Upstash Redis for low-latency edge checks.
+- **Algorithm:** Sliding Window.
+- **Limit:** 5 requests per 60 seconds per IP address.
+- **Storage:** Managed via Upstash Redis for low-latency edge checks.
 
-Secure Headers
+### Secure Headers
+
 Middleware injects security headers into every response to prevent common attacks:
 
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY (Clickjacking protection)
-Strict-Transport-Security (Force HTTPS)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY` (Clickjacking protection)
+- `Strict-Transport-Security` (Force HTTPS)
 
 ## Environment Variables
 
