@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/db";
+import { prisma } from "@/lib/db/db"; // Ensure this path matches your project structure
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { sendPasswordResetEmail } from "@/lib/email/email"; // Import the new helper
 
 const forgotPasswordSchema = z.object({
   email: z.string().email(),
@@ -15,39 +16,31 @@ export async function POST(request: Request) {
     // 1. Check if user exists
     const user = await prisma.user.findUnique({ where: { email } });
 
-    // SECURITY TIP: Even if the user doesn't exist, we return 200 OK.
-    // This prevents "Email Enumeration" (hackers checking which emails valid).
+    // SECURITY TIP: Return 200 OK even if user missing to prevent enumeration
     if (!user) {
       return NextResponse.json({ success: true });
     }
 
-    // 2. Generate a secure random token
-    // We use crypto to generate a hex string
+    // 2. Generate token
     const token = randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 Hour from now
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 Hour
 
-    // 3. Store token in DB
-    // We delete old tokens for this email first to keep things clean
-    await prisma.passwordResetToken.deleteMany({ where: { email } });
+    // 3. Store token in DB (Clean up old ones first)
+    // Using transaction to ensure atomicity is a nice bonus but not strictly required here
+    await prisma.$transaction([
+      prisma.passwordResetToken.deleteMany({ where: { email } }),
+      prisma.passwordResetToken.create({
+        data: {
+          email,
+          token,
+          expiresAt,
+        },
+      }),
+    ]);
 
-    await prisma.passwordResetToken.create({
-      data: {
-        email,
-        token,
-        expiresAt,
-      },
-    });
-
-    // 4. Send Email (MOCKED)
-    // In production, use Resend/SendGrid here.
-    const resetLink = `${
-      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    }/reset-password?token=${token}`;
-
-    console.log("----------------------------------------");
-    console.log("📧 MOCK EMAIL TO:", email);
-    console.log("🔗 RESET LINK:", resetLink);
-    console.log("----------------------------------------");
+    // 4. Send Email via Resend
+    // We don't await this if we want the UI to be fast, but for reliability, we usually await it.
+    await sendPasswordResetEmail(email, token);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -57,6 +50,8 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    console.error("Forgot Password Error:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
