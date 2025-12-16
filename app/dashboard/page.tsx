@@ -1,6 +1,7 @@
 import { validateRequest } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import MobileNav from "@/app/components/MobileNav"; // <--- Import the new component
 import {
   LayoutDashboard,
   LogOut,
@@ -13,20 +14,17 @@ import {
 } from "lucide-react";
 
 export default async function DashboardPage() {
-  // 1. Check session on the server
   const { user } = await validateRequest();
 
-  // 2. Redirect if not logged in
   if (!user) {
     return redirect("/login");
   }
 
-  // Helper to determine role color
   const isAdmin = user.role === "ADMIN";
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex">
-      {/* --- SIDEBAR NAVIGATION --- */}
+      {/* --- DESKTOP SIDEBAR (Hidden on Mobile) --- */}
       <aside className="w-64 fixed h-full bg-slate-900/50 backdrop-blur-xl border-r border-slate-800 hidden md:flex flex-col">
         <div className="p-6 border-b border-slate-800 flex items-center gap-2">
           <div className="bg-blue-600 p-1.5 rounded-lg">
@@ -44,7 +42,6 @@ export default async function DashboardPage() {
           />
         </nav>
 
-        {/* User Mini Profile in Sidebar */}
         <div className="p-4 border-t border-slate-800 bg-slate-900/30">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold">
@@ -59,8 +56,6 @@ export default async function DashboardPage() {
               </p>
             </div>
           </div>
-
-          {/* Logout Form styled as a button */}
           <form action="/api/auth/logout" method="POST">
             <button
               type="submit"
@@ -74,12 +69,20 @@ export default async function DashboardPage() {
       </aside>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-1 md:ml-64 p-8">
+      {/* Added md:ml-64 to push content on desktop, but full width on mobile */}
+      <main className="flex-1 md:ml-64 p-4 md:p-8">
         {/* Top Header Area */}
-        <header className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-            <p className="text-slate-400">Welcome back to your secure vault.</p>
+        <header className="flex items-center gap-4 mb-8">
+          {/* 1. INSERT MOBILE NAV HERE */}
+          <MobileNav user={user} />
+
+          <div className="flex-1">
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+              Dashboard
+            </h1>
+            <p className="text-slate-400 text-sm md:text-base">
+              Welcome back to your secure vault.
+            </p>
           </div>
         </header>
 
@@ -88,7 +91,7 @@ export default async function DashboardPage() {
           <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/5 p-6 relative overflow-hidden group">
             <div className="absolute -right-10 -top-10 bg-red-500/10 w-40 h-40 blur-3xl rounded-full pointer-events-none" />
 
-            <div className="flex items-start justify-between relative z-10">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
               <div className="flex gap-4">
                 <div className="p-3 bg-red-500/20 rounded-xl border border-red-500/20 h-fit">
                   <ShieldAlert className="w-6 h-6 text-red-400" />
@@ -99,7 +102,7 @@ export default async function DashboardPage() {
                   </h3>
                   <p className="text-slate-400 text-sm max-w-xl">
                     You have elevated privileges. Access the user management
-                    system, system logs, and global security settings.
+                    system.
                   </p>
                 </div>
               </div>
@@ -115,14 +118,13 @@ export default async function DashboardPage() {
         )}
 
         {/* --- USER IDENTITY GRID --- */}
-        {/* This displays Email, Role, and ID nicely for normal users */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Card 1: Email */}
           <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 flex items-start gap-4 hover:border-blue-500/30 transition-colors">
             <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
               <Mail className="w-6 h-6" />
             </div>
-            <div className="overflow-hidden">
+            <div className="overflow-hidden w-full">
               <p className="text-sm font-medium text-slate-400">
                 Email Identity
               </p>
@@ -173,7 +175,7 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Placeholder for future activity */}
+        {/* Activity Placeholder */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-8 flex flex-col items-center justify-center min-h-[300px] text-center">
           <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
             <Activity className="w-8 h-8 text-slate-600" />
@@ -189,6 +191,7 @@ export default async function DashboardPage() {
   );
 }
 
+// Keep the NavItem component for the server-side sidebar
 function NavItem({
   href,
   icon: Icon,
