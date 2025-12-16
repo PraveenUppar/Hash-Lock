@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
             If an account exists for {email}, we have sent a password reset
             link.
           </p>
-          <p className="text-sm text-gray-500 text-xs">
+          <p className=" text-gray-500 text-xs">
             (Check your server console for the mock link!)
           </p>
           <Link href="/login" className="text-blue-600 hover:underline">
